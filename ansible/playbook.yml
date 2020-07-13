@@ -1,0 +1,81 @@
+- hosts: elastic000
+  roles:
+    - role: elastic.elasticsearch
+  vars:
+    es_heap_size: "300m"
+    es_enable_http_ssl: true
+    es_enable_transport_ssl: true
+    es_api_basic_auth_username: elastic
+    es_api_basic_auth_password: changeme
+    es_data_dirs:
+      - "/opt/elasticsearch/data"
+    es_log_dir: "/opt/elasticsearch/logs"
+    es_ssl_keystore: "certs/demo-keystore.p12"
+    es_ssl_truststore: "certs/demo-truststore.p12"
+    es_validate_certs: no
+    es_config:
+      cluster.name: "demo-cluster"
+      cluster.initial_master_nodes: ["elastic000", "elastic001", "elastic002"]
+      discovery.seed_hosts:  ["elastic000:9300", "elastic001:9300", "elastic002:9300"]
+      network.host: 20.10.11.203
+      http.port: 9200
+      node.data: true
+      node.master: true
+      bootstrap.memory_lock: true
+      xpack.security.authc.realms.file.file1.order: 0
+      xpack.security.authc.realms.native.native1.order: 1
+
+- hosts: elastic001
+  roles:
+    - role: elastic.elasticsearch
+  vars:
+    es_heap_size: "300m"
+    es_enable_http_ssl: true
+    es_enable_transport_ssl: true
+    es_api_basic_auth_username: elastic
+    es_api_basic_auth_password: changeme
+    es_data_dirs:
+      - "/opt/elasticsearch/data"
+    es_log_dir: "/opt/elasticsearch/logs"
+    es_ssl_keystore: "certs/demo-keystore.p12"
+    es_ssl_truststore: "certs/demo-truststore.p12"
+    es_validate_certs: no
+    es_config:
+      cluster.name: "demo-cluster"
+      cluster.initial_master_nodes:  ["elastic000", "elastic001", "elastic002"]
+      discovery.seed_hosts: ["elastic000:9300", "elastic001:9300", "elastic002:9300"]
+      network.host: 20.10.11.15
+      http.port: 9200
+      node.data: true
+      node.master: true
+      bootstrap.memory_lock: true
+      xpack.security.authc.realms.file.file1.order: 0
+      xpack.security.authc.realms.native.native1.order: 1
+
+
+- hosts: elastic002
+  roles:
+    - role: elastic.elasticsearch
+  vars:
+    es_heap_size: "300m"
+    es_enable_http_ssl: true
+    es_enable_transport_ssl: true
+    es_api_basic_auth_username: elastic
+    es_api_basic_auth_password: changeme
+    es_data_dirs:
+      - "/opt/elasticsearch/data"
+    es_log_dir: "/opt/elasticsearch/logs"
+    es_ssl_keystore: "certs/demo-keystore.p12"
+    es_ssl_truststore: "certs/demo-truststore.p12"
+    es_validate_certs: no
+    es_config:
+      cluster.name: "demo-cluster"
+      cluster.initial_master_nodes: ["elastic000", "elastic001", "elastic002"]
+      discovery.seed_hosts: ["elastic000:9300", "elastic001:9300", "elastic002:9300"] 
+      network.host: 20.10.11.167 
+      http.port: 9200
+      node.data: true
+      node.master: true
+      bootstrap.memory_lock: true
+      xpack.security.authc.realms.file.file1.order: 0
+      xpack.security.authc.realms.native.native1.order: 1

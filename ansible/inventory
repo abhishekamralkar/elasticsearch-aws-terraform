@@ -1,0 +1,4 @@
+[elastic]
+elastic000 ansible_host=1X.1XX.1XX.1XX ansible_user=ec2-user ansible_ssh_private_key_file=~/.ssh/id_rsa
+elastic001 ansible_host=1X.2XX.2XX.8X ansible_user=ec2-user ansible_ssh_private_key_file=~/.ssh/id_rsa
+elastic002 ansible_host=1X.2XX.9X.1XX  ansible_user=ec2-user ansible_ssh_private_key_file=~/.ssh/id_rsa

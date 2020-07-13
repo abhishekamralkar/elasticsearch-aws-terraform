@@ -1,0 +1,257 @@
+#+title: ElasticSearch Cluster
+
+* Cloud
+
+*** AWS
+
+We are using AWS cloud services to run our 3 node Elasticsearch Cluster.
+
+ - VPC + Networking
+ - SNS
+ - CloudWatch
+ - Private Hosted Zone (Created Manually for internal communication)
+ - Ec2 Instances 5th gen
+
+* Cloud Resource Provisioner
+
+*** Terraform
+
+Terraform is a tool for building, changing, and versioning infrastructure safely and efficiently. Terraform can manage existing and popular service providers as well as custom in-house solutions.
+
+*** Why Terraform?
+
+ - Infrastructure as a code
+ - Supports States for the infrastructure
+ - Can be use with all major cloud so no need toi change tools of move to other cloud
+ - Modularise
+ - Can do Dry Run
+
+We will be using AWS IAM and AWS STS to assume a role abd boot resources.
+
+To boot the AWS Resources.
+
+#+BEGIN_SRC
+# PubSub
+cd demo/pubsub
+
+terraform init
+terraform plan
+terraform apply
+
+# KeyPair
+
+cd demo/keypair
+
+terraform init
+terraform plan
+terraform apply
+
+# Networking
+
+cd demo/networking
+
+terraform init
+terraform plan
+terraform apply
+
+# Compute
+
+cd demo/elasticsearch
+
+terraform init
+terraform plan
+terraform apply
+#+END_SRC
+
+- All the code is written in Terraform latest version. Source of truth for the environment is git repo for the module.
+
+- As this is demo I have assigned the public IP's to the Elasticsearch nodes and running in public subnet but in Production its good to run a Elasticsearch in Private subnet and no public IP assigned.
+
+- To disable the public IP its a boolean flag.
+
+- Also not used another EBS for the Elasticsearch data storage in production we should use SSD disks with I/O for better performance.
+
+- Always use a VPN to connect to the AWS VPC rather than whitelisting the Dynamic users IP.
+
+- Create a SSH users as per the requirement.
+
+- Disable the default SSH user in our case Amazon Linux 2 (ec2-user).
+
+- In production running terraform should be via CI tools like Jenkins and master branch should not allowed any commits. Jenkins should trigger only when any user branch get merged into  master or depends
+  if any other strategy followed.
+
+Note: Terraform code is inspired from https://github.com/antonbabenko examples.
+
+* Configuration Management
+
+*** Ansible
+
+I am a big fan of keeping Provisioning and Config Management isolated. Though Terraform supports Ansible to be run as provisioner but in the demo we will be running Ansible once the provisioning finish.
+We are using Offical Elasticsearch Ansible playbook too bootstrap Elasticsearch secured cluster  over SSL/TSL using self signed vertificates and CA. Please look the playbook.yml file for Secure
+connection details.
+
+You might see some credentials in public repo but again this is due to demo but in Prod it should be secure in Vault.
+
+***  Why Ansible?
+
+Ansible is simple to use and write and the only prerequisite is SSH connection so we dont need to worry about installation of any agent and server.
+We can use AWX in production to avoid manual running on Ansible.
+
+#+BEGIN_SRC
+
+# Generate SSL
+
+bin/elasticsearch-certutil ca --out ./demo-ca.p12 --pass ""
+bin/elasticsearch-certutil cert --ca ./demo-ca.p12 --out .demo-keystore.p12 --pass ""
+
+cd demo/ansible
+
+ansible-playbook -i inventory playbook.yml
+#+END_SRC
+
+* Monitoring
+
+We can use [[https://github.com/python-diamond][Diamond]] as a metrics collecting agent and send the timeseries data to Graphite and use Grafana for visualization or we can use Prometheus along with Grafana.
+
+Key metrics to monitor
+
+*** Operating System
+
+ - CPU
+ - Memory
+ - Disk
+ - Disk I/O
+ - Network In/Out
+ - File Descriptors
+
+*** ElasticSearch
+
+ - Heap, GC
+ - Cluster Health
+ - Nodes
+ - Indices
+
+Alerting can be done via PagerDuty or OpsGenie.
+
+* Elasticsearch
+
+We are booting 3 node Elasticsearch cluster where all 3 nodes will acts as a master and data nodes. In production its good idea to keep Master and Data nodes on separate machines.
+The Elasticsearch cluster is secured via SSL/TLS, so all internode-communication will be encrypted.
+
+As we are using the self signed certs we need to use the --insecure flag with curl commands in order to interactt with the Elasticsearch cluster.
+
+Some of the common queries are
+
+- Check cluster health
+
+#+BEGIN_SRC
+curl -u elastic:changeme --insecure -X GET https://elastic000:9200/_cluster/health?pretty
+
+#output
+
+{
+  "cluster_name" : "demo-cluster",
+  "status" : "green",
+  "timed_out" : false,
+  "number_of_nodes" : 3,
+  "number_of_data_nodes" : 3,
+  "active_primary_shards" : 4,
+  "active_shards" : 8,
+  "relocating_shards" : 0,
+  "initializing_shards" : 0,
+  "unassigned_shards" : 0,
+  "delayed_unassigned_shards" : 0,
+  "number_of_pending_tasks" : 0,
+  "number_of_in_flight_fetch" : 0,
+  "task_max_waiting_in_queue_millis" : 0,
+  "active_shards_percent_as_number" : 100.0
+}
+#+END_SRC
+
+- Create index
+
+#+BEGIN_SRC
+curl -u elastic:changeme --insecure -X PUT https://elastic000:9200/nginx-logs?pretty
+
+#output
+
+{
+  "acknowledged" : true,
+  "shards_acknowledged" : true,
+  "index" : "nginxv-logs"
+}
+#+END_SRC
+
+- Create an index with custom shards and replicas
+
+#+BEGIN_SRC
+curl -u elastic:changeme --insecure -X PUT -H "Content-Type: application/json" https://elastic000:9200/apache-logs?pretty -d '{
+"settings": {
+    "index": {
+      "number_of_shards": 2,
+      "number_of_replicas": 1
+    }
+  }
+}'
+
+#output
+{
+  "acknowledged" : true,
+  "shards_acknowledged" : true,
+  "index" : "apache-logs"
+}
+#+END_SRC
+
+- Get all the index
+
+#+BEGIN_SRC
+curl -u elastic:changeme --insecure -X GET https://elastic000:9200/_aliases?pretty
+
+#output
+{
+  "nginxv12-logs" : {
+    "aliases" : { }
+  },
+  "apache-logs" : {
+    "aliases" : { }
+  },
+  "apachev1-logs" : {
+    "aliases" : { }
+  },
+  "thisisdemo" : {
+    "aliases" : { }
+  },
+  "nginx-logs" : {
+    "aliases" : { }
+  }
+}
+
+or
+
+curl -u elastic:changeme --insecure -X GET 'https://elastic000:9200/_cat/indices?v'
+
+#output
+health status index         uuid                   pri rep docs.count docs.deleted store.size pri.store.size
+green  open   nginx-logs    zJgK2KZNRUe3bP1gIknZGA   1   1          0            0       416b           208b
+green  open   apache-logs   mYo779PbSWWTpRQyIdY5mg   2   1          0            0       832b           416b
+green  open   thisisdemo    mgP6HJAmTYOZ3hH3dbggpA   1   1          0            0       416b           208b
+green  open   apachev1-logs 99eLIRmDQGyikMDJmtDs8w   2   1          0            0       832b           416b
+green  open   nginxv12-logs _qiG3oJMQm2X8xAAL25vJA   1   1          0            0       416b           208b
+#+END_SRC
+
+- List docs in an index
+
+#+BEGIN_SRC
+curl -u elastic:changeme --insecure -X GET 'https://elastic000:9200/nginx-logs/_search'
+
+#output
+{"took":123,"timed_out":false,"_shards":{"total":1,"successful":1,"skipped":0,"failed":0},"hits":{"total":{"value":0,"relation":"eq"},"max_score":null,"hits":[]}}
+#+END_SRC
+
+- Insert data in an index
+
+#+BEGIN_SRC
+curl -u elastic:changeme --insecure -XPUT --header 'Content-Type: application/json' https://elastic000:9200/nginx-logs/_doc/1 -d '{
+   "school" : "Harvard"
+}'
+#+END_SRC
